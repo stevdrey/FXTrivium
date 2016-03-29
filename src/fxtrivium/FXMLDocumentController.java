@@ -45,6 +45,7 @@ import javafx.scene.control.RadioButton;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.control.TitledPane;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Pane;
@@ -57,6 +58,7 @@ import jtrivium.utils.FileEncrypt;
  * @author srey
  */
 public class FXMLDocumentController implements Initializable {
+    private final byte MAX_LENGTH= 10;
     
     private Label label;
     @FXML
@@ -89,7 +91,7 @@ public class FXMLDocumentController implements Initializable {
     private Button btn_inputFile;
     @FXML
     private TextArea txta_output;
-    @FXML
+    @FXML    
     private ButtonBar bpn_buttonContainer;
     @FXML
     private Button btn_clear;
@@ -105,6 +107,10 @@ public class FXMLDocumentController implements Initializable {
     private RadioButton rb_hex;
     @FXML
     private RadioButton rb_base64;
+    @FXML
+    private ToggleGroup tgrb_output;
+    @FXML
+    private RadioButton rb_binary;
         
     @Override
     public void initialize(URL url, ResourceBundle rb) {
@@ -120,10 +126,16 @@ public class FXMLDocumentController implements Initializable {
             
             this.txta_text.setDisable(!newValue);
         });
-    }    
+    }      
     
     // section of private methods
     
+    /**
+     * Este metodo se encarga de limpiar todos los controles de la pantalla, segun su parametro.
+     * 
+     * @param all 
+     *                  Indica si se desea limpiart todos los controles de la pantalla.
+     */
     private void clear(boolean all) {
         if (all) {
             this.txt_inputFile.clear();
@@ -137,6 +149,16 @@ public class FXMLDocumentController implements Initializable {
         this.txta_output.clear();
     }
     
+    /**
+     * Este metodo se encarga de validar los parametros ingresados por el usuario.
+     * 
+     * Si uno de los parametros es invalido muestra un mensaje al usario y le pone el {@code foco} al control
+     * que no cumpla con las condiciones.
+     * 
+     * @return 
+     *      Retorna un {@code true} en caso que los parametros se ingresaran de forma satisfactoria, en caso contrario retorna un
+     *      {@code false}.
+     */
     private boolean validateParams() {
         if (this.txt_key.getText().isEmpty()) {
             DialogUtil.showWarning("Faltan Parametros", 
@@ -144,11 +166,23 @@ public class FXMLDocumentController implements Initializable {
             
             this.txt_key.requestFocus();
             return false;
-        } 
+        } else if (this.txt_key.getText().length() > 10) {
+            DialogUtil.showWarning("Parametro incorrecto", 
+                    "La cantidad de caracteres para la clave debe ser mayor o igual a 10");
+            
+            this.txt_key.requestFocus();
+            return false;
+        }
         
         if (this.txt_vi.getText().isEmpty()) {
             DialogUtil.showWarning("Faltan Parametros", 
                     "Debe de ingresar el vector de incialización");
+            
+            this.txt_vi.requestFocus();
+            return false;
+        } else if (this.txt_vi.getText().length() > 10) {
+            DialogUtil.showWarning("Parametro incorrecto", 
+                    "La cantidad de caracteres para el vector de inicialización debe ser mayor o igual a 10");
             
             this.txt_vi.requestFocus();
             return false;
@@ -171,6 +205,19 @@ public class FXMLDocumentController implements Initializable {
         return true;
     }
     
+    /**
+     * Este metodo se encarga de codificar un arreglo de bytes en texto hexadecimal.
+     * 
+     * @param buf
+     *                  Arreglo que contiene los datos a codificar.
+     * 
+     * @param sb
+     *                  Instancia a la cual se le concatenaran los datos codificados en hexadecimal.
+     * 
+     * @return 
+     *          Retorna una instancia que implementa {@link Appendable}, la cual contendra todo el texto codificado
+     *          en hexadecimal.
+     */
     private Appendable hexEncode(byte buf[], Appendable sb)    {   
         final Formatter formatter = new Formatter(sb);   
 
@@ -190,6 +237,54 @@ public class FXMLDocumentController implements Initializable {
         return sb;   
     }
     
+    /**
+     * Este metodo se encarga de codificar los datos contendios en un arreglo de bytes a su representacion
+     * binaria.
+     * 
+     * @param buffred
+     *                  Arreglo que contiene los datos a codificar.
+     * 
+     * @param sb
+     *                  Instancia a la cual se le concatenaran los datos codificados en binario.
+     * 
+     * @return 
+     *          Retorna una instancia que implementa {@link Appendable}, la cual contendra todo el texto codificado
+     *          en binaria.
+     */
+    private Appendable binaryEncode(byte[] buffred, Appendable sb) {
+        
+        try {
+            for (byte b : buffred)  {
+                int val = b;
+                
+                for (int i = 0; i < 8; i++) {
+                    sb.append((val & 128) == 0 ? "0" : "1");
+                    val <<= 1;
+                }
+                    
+                sb.append(" ");
+            }
+            
+        } catch (IOException ex) {
+            Logger.getLogger(FXMLDocumentController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        
+        return sb;
+    }
+    
+    /**
+     * Este metodo es el encargado de cifrar el texto con el algoritmo Trivium y 
+     * codificados sengun las opciones brindadas por el usuario.
+     * 
+     * @param text
+     *                  Instancia que contiene el texto que se desea cifrar.
+     * 
+     * @param cipher
+     *                  Instancia que contiene la implementacion del algoritmo Trivium.
+     * 
+     * @return 
+     *      Retorna una instancia de tipo {@code String} con los datos encriptados
+     */
     private String encrypt(String text, JTrivium cipher) {
         StringBuilder result= new StringBuilder();
         
@@ -207,8 +302,11 @@ public class FXMLDocumentController implements Initializable {
                     if (this.rb_hex.isSelected())
                         this.hexEncode(bufferd, result);
                     
-                    else
+                    else  if (this.rb_base64.isSelected())
                         result.append(Base64.getMimeEncoder().encodeToString(bufferd));
+                    
+                    else
+                        this.binaryEncode(bufferd, result);
                 }
                 
             } while (readBytes > 0) ;
@@ -237,28 +335,43 @@ public class FXMLDocumentController implements Initializable {
             byte[] key= null;
             byte[] iv= null;
             
+            // primero se codifica en hexadecimal la clave y se optiene un arreglo de bytes.
             key= this.hexEncode(this.txt_key.getText().getBytes(), sb).toString().getBytes();
             
             sb.delete(0, sb.length());
             
+            // se codifica en hexadecimal el vector de inicalizacion y se optien un arreglo de bytes.
             iv= this.hexEncode(this.txt_vi.getText().getBytes(), sb).toString().getBytes();
             
+            // se incializa la intancia que implementa el algoritmo Trivium
             JTrivium cipher= new JTrivium(key, iv, false);
             
+            // se pregunta si el usuario puso el texto plano en un campo de texto o TextArea
             if (this.ckb_text.isSelected()) 
                 this.txta_output.setText(this.encrypt(this.txta_text.getText(), cipher));
             
+            // en caso que el usuario carge un archivo que contenga el texto plano a cifrar.
             else {
                 try {
+                    // se crea un archivo temporal sobre el que operara posteriormente.
                     Path tmpFile= Files.createTempFile("trivium", null);
                     Path inputFile= Paths.get(this.txt_inputFile.getText());
                     
                     if (inputFile != null && Files.exists(inputFile)) {
+                        // se instancia una clase que se encarga de encriptar usando el algoritmo Trivium em un archivo.
                         try (FileEncrypt fileEncryp= new FileEncrypt(inputFile.toString(), tmpFile.toString(), cipher, 512)) {
-                            fileEncryp.encrypt(this.rb_hex.isSelected() ? 
-                                    FileEncrypt.TypeEncode.HEX : FileEncrypt.TypeEncode.BASE64);
+                            if (this.rb_base64.isSelected())
+                                fileEncryp.encrypt(FileEncrypt.TypeEncode.BASE64);
                             
-                            Files.readAllLines(tmpFile).
+                            else if (this.rb_hex.isSelected())
+                                fileEncryp.encrypt(FileEncrypt.TypeEncode.HEX);
+                            
+                            else 
+                                fileEncryp.encrypt(FileEncrypt.TypeEncode.BINARY);
+                            
+                            // finalmente se leen todas las lienas del archivo temporal y se muestra al usuario
+                            // el texto cifrado.
+                            Files.readAllLines(tmpFile, StandardCharsets.UTF_8).
                                     forEach(s -> this.txta_output.appendText(s + System.getProperty("line.separator")));
                         }
                     }

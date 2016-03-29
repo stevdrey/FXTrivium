@@ -55,6 +55,7 @@
                                  </toggleGroup>
                               </RadioButton>
                               <RadioButton fx:id="rb_base64" layoutX="125.0" layoutY="7.0" mnemonicParsing="false" text="Base64" toggleGroup="$tgrb_output" />
+                              <RadioButton fx:id="rb_binary" layoutX="214.0" layoutY="8.0" mnemonicParsing="false" text="Binario" toggleGroup="$tgrb_output" />
                            </children>
                         </Pane>
                      </children>
